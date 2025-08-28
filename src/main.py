@@ -1,79 +1,47 @@
-"""Main module of the application."""
-
-from contextlib import asynccontextmanager
-from os import listdir
-from pathlib import Path
+import logging
+from os import environ, getenv
 
 import uvicorn
 from fastapi import APIRouter, FastAPI
+from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 from fastapi_utils.tasks import repeat_every
-from uvicorn.config import LOGGING_CONFIG
 
-from config.main import APP_CONFIG
+from config import LOG_FORMAT, LOG_FORMAT_DATE, cycle_minimun
+from dependencies import APPLICATION_PATH, get_version, logo, str2bool, title, title_warning
+from init import CONFIG, DB
 from models.jobs import Job
 from routers import account, action, data, html, info
-from utils import get_version
 
+if "DEV" in environ or "DEBUG" in environ:
+    title_warning("Run in Development mode")
+else:
+    title("Run in production mode")
 
-#######################################################################################################################
-# JOBS
-@repeat_every(seconds=APP_CONFIG.server.cycle, wait_first=False)
-def job_boot():
-    """Bootstap jobs."""
-    Job().boot()
+title("Chargement du config.yaml...")
+usage_point_list = []
+if CONFIG.list_usage_point() is not None:
+    for upi, upi_data in CONFIG.list_usage_point().items():
+        logging.info(f"{upi}")
+        DB.set_usage_point(upi, upi_data)
+        usage_point_list.append(upi)
+        logging.info("  => Success")
+else:
+    logging.warning("Aucun point de livraison détecté.")
 
+title("Nettoyage de la base de données...")
+DB.clean_database(usage_point_list)
 
-@repeat_every(seconds=3600, wait_first=True)
-def job_home_assistant():
-    """Home Assistant Ecowatt."""
-    Job().export_home_assistant(target="ecowatt")
+swagger_configuration = {
+    "operationsSorter": "method",
+    # "defaultModelRendering": "model",
+    "tagsSorter": "alpha",
+    # "docExpansion": "none",
+    "deepLinking": True,
+}
+APP = FastAPI(title="MyElectricalData", swagger_ui_parameters=swagger_configuration)
+APP.mount("/static", StaticFiles(directory=f"{APPLICATION_PATH}/static"), name="static")
 
-
-@repeat_every(seconds=600, wait_first=False)
-def job_gateway_status():
-    """Gateway status check."""
-    Job().get_gateway_status()
-
-
-@asynccontextmanager
-async def bootstrap(app: FastAPI):  # pylint: disable=unused-argument
-    """Bootstap jobs."""
-    await job_boot()
-    await job_home_assistant()
-    await job_gateway_status()
-    yield
-
-
-APP = FastAPI(
-    title="MyElectricalData",
-    version=get_version(),
-    description="MyElectricalData",
-    contact={
-        "name": "m4dm4rtig4n",
-        "url": "https://github.com/MyElectricalData/myelectricaldata_import/issues",
-    },
-    license_info={
-        "name": "Apache 2.0",
-        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
-    },
-    swagger_configuration={
-        "operationsSorter": "method",
-        "tagsSorter": "alpha",
-        "deepLinking": True,
-    },
-    lifespan=bootstrap,
-)
-
-#######################################################################################################################
-# Static files
-STATIC_FOLDER = f"{APP_CONFIG.application_path}/static"
-if Path(STATIC_FOLDER).is_dir() and listdir(STATIC_FOLDER):
-    APP.mount("/static", StaticFiles(directory=STATIC_FOLDER), name="static")
-
-
-#######################################################################################################################
-# ROUTER
 ROUTER = APIRouter()
 APP.include_router(info.ROUTER)
 APP.include_router(html.ROUTER)
@@ -81,35 +49,95 @@ APP.include_router(data.ROUTER)
 APP.include_router(action.ROUTER)
 APP.include_router(account.ROUTER)
 
-#######################################################################################################################
-# FastAPI opentelemetry configuration
-APP_CONFIG.tracing_fastapi(APP)
+INFO = {
+    "title": "MyElectricalData",
+    "version": get_version(),
+    "description": "",
+    "contact": {
+        "name": "m4dm4rtig4n",
+        "url": "https://github.com/MyElectricalData/myelectricaldata_import/issues",
+    },
+    "license_info": {
+        "name": "Apache 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.html",
+    },
+    "routes": APP.routes,
+    "servers": [],
+}
 
-#######################################################################################################################
-# BOOTSTRAP
+OPENAPI_SCHEMA = get_openapi(
+    title=INFO["title"],
+    version=INFO["version"],
+    description=INFO["description"],
+    contact=INFO["contact"],
+    license_info=INFO["license_info"],
+    routes=INFO["routes"],
+    servers=INFO["servers"],
+)
+OPENAPI_SCHEMA["info"]["x-logo"] = {
+    "url": "https://pbs.twimg.com/profile_images/1415338422143754242/axomHXR0_400x400.png"
+}
+
+APP.openapi_schema = OPENAPI_SCHEMA
+
+CYCLE = CONFIG.get("cycle")
+if not CYCLE:
+    CYCLE = 14400
+else:
+    if CYCLE < cycle_minimun:
+        logging.warning("Le cycle minimun est de 3600s")
+        CYCLE = cycle_minimun
+        CONFIG.set("cycle", cycle_minimun)
+
+
+@APP.on_event("startup")
+@repeat_every(seconds=CYCLE, wait_first=False)
+def import_job():
+    Job().boot()
+
+
+@APP.on_event("startup")
+@repeat_every(seconds=3600, wait_first=True)
+def home_assistant_export():
+    Job().export_home_assistant(target="ecowatt")
+
+
+@APP.on_event("startup")
+@repeat_every(seconds=600, wait_first=False)
+def gateway_status():
+    Job().get_gateway_status()
+
+
 if __name__ == "__main__":
-    log_config = LOGGING_CONFIG
-    log_config["formatters"]["access"]["fmt"] = APP_CONFIG.logging.log_format
-    log_config["formatters"]["access"]["datefmt"] = APP_CONFIG.logging.log_format_date
-    log_config["formatters"]["default"]["fmt"] = APP_CONFIG.logging.log_format
-    log_config["formatters"]["default"]["datefmt"] = APP_CONFIG.logging.log_format_date
-    uvicorn_params = {
-        "reload": False,
-        "log_config": log_config,
-        "host": APP_CONFIG.server.cidr,
-        "port": APP_CONFIG.server.port,
-        "log_level": "error",
-        "reload_dirs": None,
-        "reload_includes": None,
-        "reload_excludes": None,
-    }
-    if APP_CONFIG.logging.log_http:
-        uvicorn_params["log_level"] = "info"
-    if APP_CONFIG.dev:
-        uvicorn_params["reload"] = True
-        uvicorn_params["reload_dirs"] = [APP_CONFIG.application_path]
-        uvicorn_params["reload_includes"] = [APP_CONFIG.application_path]
-        uvicorn_params["reload_excludes"] = [".venv", ".git/*", ".idea/*", ".vscode/*", ".py[cod]"]
+    # from pypdf import PdfReader
+    # import requests
+    # url = "https://particulier.edf.fr/content/dam/2-Actifs/Documents/Offres/Grille_prix_Tarif_Bleu.pdf"
+    # file = "/tmp/Grille_prix_Tarif_Bleu.pdf"
+    # r = requests.get(url, allow_redirects=True, verify=False)
+    # reader = PdfReader(file)
+    # text = reader.pages[0].extract_text() + "\n"
+    # for line in text.splitlines():
+    #     if line.startswith("6 "):
+    #         print(line)
+    # exit()
 
-    uvicorn_params = {**uvicorn_params, **APP_CONFIG.ssl_config.__dict__}
+    logo(get_version())
+    log_config = uvicorn.config.LOGGING_CONFIG
+    log_config["formatters"]["access"]["fmt"] = LOG_FORMAT
+    log_config["formatters"]["access"]["datefmt"] = LOG_FORMAT_DATE
+    log_config["formatters"]["default"]["fmt"] = LOG_FORMAT
+    log_config["formatters"]["default"]["datefmt"] = LOG_FORMAT_DATE
+    uvicorn_params = {
+        "host": "0.0.0.0",
+        "port": CONFIG.port(),
+        "log_config": log_config,
+    }
+    if ("DEV" in environ and str2bool(getenv("DEV"))) or ("DEBUG" in environ and str2bool(getenv("DEBUG"))):
+        uvicorn_params["reload"] = True
+        uvicorn_params["reload_dirs"] = [APPLICATION_PATH]
+
+    ssl_config = CONFIG.ssl_config()
+    if ssl_config:
+        uvicorn_params = {**uvicorn_params, **ssl_config}
+
     uvicorn.run("main:APP", **uvicorn_params)

@@ -1,24 +1,15 @@
-"""Configation of usage point."""
-
 import datetime
-from pathlib import Path
 
-import pytz
 from jinja2 import Template
 from mergedeep import Strategy, merge
 
-from config.main import APP_CONFIG
-from database.contracts import DatabaseContracts
-from database.usage_points import DatabaseUsagePoints
-from utils import str2bool
-
-TIMEZONE = pytz.timezone("Europe/Paris")
+from dependencies import APPLICATION_PATH, str2bool
 
 
 class Configuration:
-    """Represents the configuration settings for the application."""
-
-    def __init__(self, title="", usage_point_id=0, display_usage_point_id=False):
+    def __init__(self, db, title="", usage_point_id=0, display_usage_point_id=False):
+        self.db = db
+        self.application_path = APPLICATION_PATH
         self.title = title
         self.usage_point_id = usage_point_id
         self.display_usage_point_id = display_usage_point_id
@@ -92,13 +83,13 @@ class Configuration:
                     "par les API d'Enedis."
                     "<br><br><b>ATTENTION, si cette valeur n'est pas correctement définie vous risquez de ne pas "
                     "récupérer la totalité de vos données ou encore d'avoir un dépassement du quota</b>",
-                    "type": datetime.datetime.now(tz=TIMEZONE),
+                    "type": datetime.datetime.now(),
                     "default": "",
                 },
                 "consumption_detail": {
                     "title": "Consommation détaillée",
-                    "help": "Active/Désactive la récupération de la consommation détaillée.<br><br></b>ATTENTION</b>, "
-                    "pour fonctionner il vous faut activer le relevé de consommation horaire sur le site d'Enedis"
+                    "help": "Active/Désactive la récupération de la consommation détaillée.<br><br></b>ATTENTION</b>, pour "
+                    "fonctionner il vous faut activer le relevé de consommation horaire sur le site d'Enedis"
                     "Plus d'informations sont disponibles <a href='https://www.myelectricaldata.fr/faq'>ici</a>",
                     "type": True,
                     "default": True,
@@ -110,7 +101,7 @@ class Configuration:
                     "par les API d'Enedis."
                     "<br><br><b>ATTENTION, si cette valeur n'est pas correctement définie vous risquez de ne pas "
                     "récupérer la totalité de vos données ou encore d'avoir un dépassement du quota</b>",
-                    "type": datetime.datetime.now(tz=TIMEZONE),
+                    "type": datetime.datetime.now(),
                     "default": "",
                 },
                 "consumption_price_hc": {
@@ -168,14 +159,14 @@ class Configuration:
                     "par les API d'Enedis."
                     "<br><br><b>ATTENTION, si cette valeur n'est pas correctement définie vous risquez de ne pas "
                     "récupérer la totalité de vos données ou encore d'avoir un dépassement de quota</b>",
-                    "type": datetime.datetime.now(tz=TIMEZONE),
+                    "type": datetime.datetime.now(),
                     "default": "",
                 },
                 "production_detail": {
                     "title": "Production détaillée",
                     "help": "Active/Désactive la récupération de la production détaillée via vos panneaux solaires."
-                    "<br><br></b>ATTENTION</b>, pour fonctionner il vous faut activer le relevé de consommation "
-                    "horaire sur le site d'Enedis<br>Plus d'informations sont disponibles "
+                    "<br><br></b>ATTENTION</b>, pour fonctionner il vous faut activer le relevé de consommation horaire"
+                    "sur le site d'Enedis<br>Plus d'informations sont disponibles "
                     "<a href='https://www.myelectricaldata.fr/faq'>ici</a>",
                     "type": True,
                     "default": False,
@@ -187,7 +178,7 @@ class Configuration:
                     "par les API d'Enedis."
                     "<br><br><b>ATTENTION, si cette valeur n'est pas correctement définie vous risquez de ne pas "
                     "récupérer la totalité de vos données ou encore d'avoir un dépassement de quota</b>",
-                    "type": datetime.datetime.now(tz=TIMEZONE),
+                    "type": datetime.datetime.now(),
                     "default": "",
                 },
                 "production_price": {
@@ -215,17 +206,16 @@ class Configuration:
                 strategy=Strategy.ADDITIVE,
             )
 
-    def html(self):  # noqa: PLR0912, PLR0912, PLR0915, C901
-        """Generate the HTML representation of the configuration."""
+    def html(self):
         current_cat = ""
         if self.usage_point_id != 0:
             configuration = f"""
             <div id="configuration" title="{self.title}" style="display: none">
-                <form id="formConfiguration" action="/configuration/{self.usage_point_id}" method="POST">
-                    <table class="table_configuration">
+                <form id="formConfiguration" action="/configuration/{self.usage_point_id}" method="POST"> 
+                    <table class="table_configuration">     
             """
-            config = DatabaseUsagePoints(self.usage_point_id).get()
-            contract = DatabaseContracts(self.usage_point_id).get()
+            config = self.db.get_usage_point(self.usage_point_id)
+            contract = self.db.get_contract(self.usage_point_id)
             current_cat = ""
             for cat, cat_data in self.config.items():
                 for key, data in cat_data.items():
@@ -248,7 +238,7 @@ class Configuration:
                             configuration += f"""
                             <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
                         configuration += "</tr>"
-                    elif isinstance(var_type, bool):
+                    elif type(var_type) == bool:
                         checked = ""
                         value = str2bool(value)
                         if value:
@@ -256,27 +246,22 @@ class Configuration:
                         configuration += f"""
                         <tr>
                             <td class="key">{title}</td>
-                            <td class="value"><input type="checkbox" style="height: 20px;cursor: pointer;"
-                            id="configuration_{key}" name="{key}" {checked}></td>"""
+                            <td class="value"><input type="checkbox" style="height: 20px;cursor: pointer;" id="configuration_{key}" name="{key}" {checked}></td>"""
                         if "help" in data:
                             configuration += f"""
                             <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
                         configuration += "</tr>"
-                    elif isinstance(var_type, (str, float)):
-                        if value is None:
-                            value = ""
+                    elif type(var_type) == str or type(var_type) == float:
                         configuration += f"""
                         <tr>
                             <td class="key">{title}</td>
-                            <td class="value"><input type="text" id="configuration_{key}" name="{key}" value="{value}">
-                            </td>"""
+                            <td class="value"><input type="text" id="configuration_{key}" name="{key}" value="{value}"></td>"""
                         if "help" in data:
                             configuration += f"""
                             <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
                         configuration += "</tr>"
-                    elif isinstance(var_type, list):
-                        configuration += f"""<tr>
-                        <td class="key">{title}</td><td class="value"><select id="configuration_{key}" name="{key}">"""
+                    elif type(var_type) == list:
+                        configuration += f'<tr><td class="key">{title}</td><td class="value"><select id="configuration_{key}" name="{key}">'
                         for option in var_type:
                             selected = ""
                             if option == value:
@@ -295,8 +280,7 @@ class Configuration:
                         configuration += f"""
                         <tr>
                             <td class="key">{title}</td>
-                            <td class="value"><input type="text"
-                              id="configuration_{key}" name="{key}" value="{date}"></td>"""
+                            <td class="value"><input type="text" id="configuration_{key}" name="{key}" value="{date}"></td>"""
                         if "help" in data:
                             configuration += f"""
                             <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
@@ -304,8 +288,8 @@ class Configuration:
         else:
             configuration = f"""
             <div id="configuration" title="{self.title}" style="display: none">
-                <form id="formConfiguration" action="/new_account" method="POST">
-                    <table class="table_configuration">
+                <form id="formConfiguration" action="/new_account" method="POST"> 
+                    <table class="table_configuration">     
             """
             for cat, cat_data in self.config.items():
                 for key, data in cat_data.items():
@@ -314,7 +298,6 @@ class Configuration:
                         current_cat = cat
                     title = data["title"]
                     var_type = data["type"]
-                    default = False
                     if "default" in data:
                         default = data["default"]
                     if var_type is None:
@@ -325,50 +308,44 @@ class Configuration:
                             configuration += f"""
                                     <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
                         configuration += "</tr>"
-                    elif isinstance(var_type, bool):
+                    elif type(var_type) == bool:
                         checked = ""
                         if default:
                             checked = "checked"
                         configuration += f"""
                                 <tr>
                                     <td class="key">{title}</td>
-                                    <td class="value">
-                                    <input type="checkbox" style="height: 20px;cursor: pointer;"
-                                    id="configuration_{key}" name="{key}" {checked}></td>"""
+                                    <td class="value"><input type="checkbox" style="height: 20px;cursor: pointer;" id="configuration_{key}" name="{key}" {checked}></td>"""
                         if "help" in data:
                             configuration += f"""
                                     <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
-                        configuration += "</tr>"
-                    elif isinstance(var_type, (str, float)):
+                        configuration += f"</tr>"
+                    elif type(var_type) == str or type(var_type) == float:
                         configuration += f"""
                                 <tr>
                                     <td class="key">{title}</td>
-                                    <td class="value">
-                                    <input type="text" id="configuration_{key}" name="{key}" value="{default}"></td>"""
+                                    <td class="value"><input type="text" id="configuration_{key}" name="{key}" value="{default}"></td>"""
                         if "help" in data:
                             configuration += f"""
                                     <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
-                        configuration += "</tr>"
-                    elif isinstance(var_type, list):
-                        configuration += f"""<tr>
-                            <td class="key">{title}</td>
-                            <td class="value"><select id="configuration_{key}" name="{key}">"""
+                        configuration += f"</tr>"
+                    elif type(var_type) == list:
+                        configuration += f'<tr><td class="key">{title}</td><td class="value"><select id="configuration_{key}" name="{key}">'
                         selected = ""
                         for option in var_type:
                             if option == default:
                                 selected = "selected"
                             configuration += f'<option value="{option}" {selected}>{option.upper()}</option>'
-                        configuration += "</select></td>"
+                        configuration += f"</select></td>"
                         if "help" in data:
                             configuration += f"""
                                     <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
-                        configuration += "</tr>"
+                        configuration += f"</tr>"
                     elif isinstance(var_type, datetime.datetime):
                         configuration += f"""
                         <tr>
                             <td class="key">{title}</td>
-                            <td class="value"><input type="text" id="configuration_{key}" name="{key}" value=""></td>
-                        """
+                            <td class="value"><input type="text" id="configuration_{key}" name="{key}" value=""></td>"""
                         if "help" in data:
                             configuration += f"""
                             <td><i class="material-icons help" alt="{data["help"]}">help_outline</i></td>"""
@@ -377,21 +354,19 @@ class Configuration:
         return configuration
 
     def javascript(self):
-        """Generate JavaScript code based on the configuration input."""
         configuration_input = ""
-        for _, cat_data in self.config.items():
+        for cat, cat_data in self.config.items():
             for key, data in cat_data.items():
                 var_type = data["type"]
-                if isinstance(var_type, bool):
+                if type(var_type) == bool:
                     configuration_input += f'{key}: $("#configuration_{key}").prop("checked"),'
-                elif isinstance(var_type, (str, float)):
+                elif type(var_type) == str or type(var_type) == float:
                     configuration_input += f'{key}: $("#configuration_{key}").val(),'
-                elif isinstance(var_type, list):
+                elif type(var_type) == list:
                     configuration_input += f'{key}: $("#configuration_{key}").val(),'
                 elif isinstance(var_type, datetime.datetime):
                     configuration_input += f'{key}: $("#configuration_{key}").val(),'
-        with Path(f"{APP_CONFIG.application_path}/templates/js/usage_point_configuration.js").open(
-            encoding="UTF-8"
-        ) as file_:
+
+        with open(f"{self.application_path}/templates/js/usage_point_configuration.js") as file_:
             usage_point_configuration = Template(file_.read())
         return usage_point_configuration.render(configurationInput=configuration_input)

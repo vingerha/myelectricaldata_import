@@ -1,7 +1,8 @@
 import pytest
+from test_jobs import job
 
 from db_schema import UsagePoints
-from conftest import contains_logline
+from tests.conftest import contains_logline
 import logging
 
 
@@ -25,7 +26,7 @@ import logging
     ],
 )
 def test_get_account_status(mocker, job, caplog, status_response, status_code, requests_mock):
-    from const import URL
+    from config import URL
 
     m_set_error_log = mocker.patch("models.database.Database.set_error_log")
     m_usage_point_update = mocker.patch("models.database.Database.usage_point_update")

@@ -110,7 +110,7 @@ run: init install-poetry disable-debug disable-dev
 	@$(call poetry, --ansi python src/main.py, "Run main.py")
 
 ## Run in dev mode
-dev: init install-poetry enable-dev
+dev: init install-poetry enable-debug enable-dev
 	@$(call poetry, --ansi python src/main.py, "Run main.py")
 
 ## Enable debug mode
@@ -146,8 +146,6 @@ python-clean:
 ## TESTS
 ######################################
 ## Run PyTest
-test: pytest
-tests: pytest
 pytest: init
 	if [ ! $$? -ne 0 ]; then \
 		$(call poetry, tox -e pytest, "Run PyTest"); \
@@ -207,11 +205,6 @@ build: generate-dependencies
 	@$(call title,"Build image in local")
 	docker build ./
 
-reload-dev-container:
-	set -x
-	DOCKER_ID=$(shell docker ps | grep myelectricaldata| grep workspace | awk '{print $$NF}')
-	docker restart $$DOCKER_ID
-
 ######################################
 ## MAKEFILE FUNCTION
 ######################################
@@ -250,10 +243,3 @@ with open(f".env", 'w') as file:
 	file.write("\n".join(env))
 endef
 export set_env
-
-######################################
-## OPENTRACING DEV TOOLS
-otel-collector: jaeger
-jaeger:	## ▶ Run Jaeger (opentrace collector & UI) in local.
-	docker-compose -f toolbox/tools/jaeger.yaml up -d
-	@$(call title, "Jaeger is running on http://localhost:16686")

@@ -121,12 +121,11 @@ function sendForm() {
     if ($('#formConfiguration').valid()) {
         $.LoadingOverlay("show", loading);
         var formData = { {{configurationInput}} };
-        var usage_poind_id = $('#configuration_usage_point_id').val()
+        var usage_poind_id = $('#usage_point_id').val()
         if (usage_poind_id == undefined) {
-            var usage_poind_id = $('#usage_point_id').val()
-            var url = "/configuration/"+$('#usage_point_id').val()
-        }else{
             var url = "/new_account"
+        }else{
+            var url = "/configuration/"+$('#usage_point_id').val()
         }
         $.ajax({
             type: "POST",

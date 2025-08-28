@@ -1,31 +1,25 @@
-"""Usage Point selector."""
-
 import json
-from pathlib import Path
 
 from jinja2 import Template
 
-from config.main import APP_CONFIG
-from database.addresses import DatabaseAddresses
-from database.usage_points import DatabaseUsagePoints
+from dependencies import APPLICATION_PATH
 
 
 class UsagePointSelect:
-    """Class representing a usage point select."""
-
-    def __init__(self, config, selected_usage_point=None, choice=False):
+    def __init__(self, config, db, selected_usage_point=None, choice=False):
         self.config = config
+        self.db = db
+        self.application_path = APPLICATION_PATH
         self.selected_usage_point = selected_usage_point
         self.choice = choice
 
     def html(self):
-        """Return HTML Code."""
         list_usage_points_id = '<select name="usages_points_id" id="select_usage_point_id" class="right">'
         if self.choice:
             list_usage_points_id += '<option value="none">--- Choix du point de livraison ---</option>'
-        for config in DatabaseUsagePoints().get_all():
+        for config in self.db.get_usage_point_all():
             usage_point = config.usage_point_id
-            address_data = DatabaseAddresses(usage_point).get()
+            address_data = self.db.get_addresse(usage_point)
             if hasattr(config, "name"):
                 text = config.name
             elif address_data is not None:
@@ -57,7 +51,6 @@ class UsagePointSelect:
         return result
 
     def javascript(self):
-        """Return Javascript Code."""
-        with Path(f"{APP_CONFIG.application_path}/templates/js/usage_point_select.js").open(encoding="UTF-8") as file_:
+        with open(f"{self.application_path}/templates/js/usage_point_select.js") as file_:
             side_menu = Template(file_.read())
         return side_menu.render()

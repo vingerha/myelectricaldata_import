@@ -1,10 +1,5 @@
-"""Ajax call."""
-import inspect
-
 from fastapi import APIRouter, Path
-from opentelemetry import trace
 
-from config.main import APP_CONFIG
 from doc import DOCUMENTATION
 from models.ajax import Ajax
 
@@ -20,9 +15,7 @@ ROUTER = APIRouter(
 @ROUTER.get("/import/{usage_point_id}/", include_in_schema=False)
 def import_all_data(usage_point_id: str = Path(..., description=DOCUMENTATION["usage_point_id"])):
     """Force l'importation des données depuis la passerelle."""
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        return Ajax(usage_point_id).import_data()
+    return Ajax(usage_point_id).import_data()
 
 
 @ROUTER.get(
@@ -52,26 +45,21 @@ def import_data(
     - home_assistant
     - influxdb
     """
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        return Ajax(usage_point_id).import_data(target)
+    return Ajax(usage_point_id).import_data(target)
 
 
 @ROUTER.get("/reset/{usage_point_id}", summary="Efface les données du point de livraison.")
 @ROUTER.get("/reset/{usage_point_id}/", include_in_schema=False)
 def reset_all_data(usage_point_id: str = Path(..., description=DOCUMENTATION["usage_point_id"])):
     """Efface les données du point de livraison."""
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        return Ajax(usage_point_id).reset_all_data()
+    return Ajax(usage_point_id).reset_all_data()
 
 
 @ROUTER.get("/delete/{usage_point_id}", summary="Supprime le point de livraison.")
 @ROUTER.get("/delete/{usage_point_id}/", include_in_schema=False)
 def delete_all_data(usage_point_id: str = Path(..., description=DOCUMENTATION["usage_point_id"])):
     """Supprime le point de livraison."""
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        return Ajax(usage_point_id).delete_all_data()
+    return Ajax(usage_point_id).delete_all_data()
 
 
 @ROUTER.get(
@@ -81,9 +69,7 @@ def delete_all_data(usage_point_id: str = Path(..., description=DOCUMENTATION["u
 @ROUTER.get("/reset_gateway/{usage_point_id}/", include_in_schema=False)
 def reset_gateway(usage_point_id: str = Path(..., description=DOCUMENTATION["usage_point_id"])):
     """Efface le cache du point de livraison sur la passerelle."""
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        return Ajax(usage_point_id).reset_gateway()
+    return Ajax(usage_point_id).reset_gateway()
 
 
 @ROUTER.get(
@@ -105,11 +91,7 @@ def reset_data(
     - production_detail
     - consumption_max_power
     """
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        trace.get_current_span().set_attribute("target", target)
-        trace.get_current_span().set_attribute("date", date)
-        return Ajax(usage_point_id).reset_data(target, date)
+    return Ajax(usage_point_id).reset_data(target, date)
 
 
 @ROUTER.get(
@@ -134,11 +116,7 @@ def blacklist_data(
     - production_detail
     - consumption_max_power
     """
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        trace.get_current_span().set_attribute("target", target)
-        trace.get_current_span().set_attribute("date", date)
-        return Ajax(usage_point_id).blacklist(target, date)
+    return Ajax(usage_point_id).blacklist(target, date)
 
 
 @ROUTER.get(
@@ -185,8 +163,4 @@ def fetch_data(
     - production_detail
     - consumption_max_power
     """
-    with APP_CONFIG.tracer.start_as_current_span(f"{__name__}.{inspect.currentframe().f_code.co_name}"):
-        trace.get_current_span().set_attribute("usage_point_id", usage_point_id)
-        trace.get_current_span().set_attribute("target", target)
-        trace.get_current_span().set_attribute("date", date)
-        return Ajax(usage_point_id).fetch(target, date)
+    return Ajax(usage_point_id).fetch(target, date)
