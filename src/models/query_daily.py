@@ -71,7 +71,7 @@ class Daily:
         self.config = CONFIG
         self.db = DB
         self.url = URL
-        self.max_daily = 1095
+        self.max_daily = 1094
         self.date_format = "%Y-%m-%d"
         self.date_detail_format = "%Y-%m-%d %H:%M:%S"
         self.headers = headers
@@ -152,13 +152,17 @@ class Daily:
                         if data.status_code == 200:
                             meter_reading = json.loads(data.text)["meter_reading"]
                             interval_reading = meter_reading["interval_reading"]
+                            logging.info('Daily interval_reading :%s', interval_reading)
                             interval_reading_tmp = {}
                             for interval_reading_data in interval_reading:
                                 interval_reading_tmp[interval_reading_data["date"]] = interval_reading_data["value"]
                             for single_date in daterange(begin, end):
                                 if single_date < max_histo:
+                                    logging.info('Daily single_date2 :%s', single_date)
                                     if single_date.strftime(self.date_format) in interval_reading_tmp:
                                         # FOUND
+                                        logging.info('Daily single_date3 date :%s', datetime.combine(single_date, datetime.min.time()))
+                                        logging.info('Daily single_date3 value :%s', interval_reading_tmp[single_date.strftime(self.date_format)])
                                         self.db.insert_daily(
                                             usage_point_id=self.usage_point_id,
                                             date=datetime.combine(single_date, datetime.min.time()),
@@ -168,6 +172,7 @@ class Daily:
                                         )
                                     else:
                                         # NOT FOUND
+                                        logging.info('Daily single_date 4 NOT found adding fail increment:%s', single_date)
                                         self.db.daily_fail_increment(
                                             usage_point_id=self.usage_point_id,
                                             date=datetime.combine(single_date, datetime.min.time()),
@@ -222,25 +227,36 @@ class Daily:
         Note:
             The end date is exclusive, meaning it is not included in the range.
         """
-        end = datetime.combine((datetime.now() + timedelta(days=2)), datetime.max.time())
+        end = datetime.combine((datetime.now() + timedelta(days=1)), datetime.max.time())
         begin = datetime.combine(end - relativedelta(days=self.max_daily), datetime.min.time())
+        logging.info('Input Begin: %s, End: %s', begin, end)
+        begin = datetime.combine((datetime.now() - timedelta(days=1200)), datetime.max.time())
+        logging.info('Changed manual Begin: %s, End: %s', begin, end)
+        logging.info('Max_days_date: %s', self.max_days_date)
+        logging.info('Activation date: %s', self.activation_date)
+        
         finish = True
         result = []
         while finish:
             if self.max_days_date > begin:
+                
                 # Max day reached
                 begin = self.max_days_date
                 finish = False
+                logging.info('1 Using Begin: %s, End: %s', begin, end)
                 response = self.run(begin, end)
             elif self.activation_date and self.activation_date > begin:
                 # Activation date reached
                 begin = self.activation_date
+                #begin = datetime.combine((datetime.now() - timedelta(days=20)), datetime.max.time())
                 finish = False
+                logging.info('2 Using Begin: %s, End: %s', begin, end)
                 response = self.run(begin, end)
-            else:
+            else:   
                 response = self.run(begin, end)
                 begin = begin - relativedelta(months=self.max_daily)
                 end = end - relativedelta(months=self.max_daily)
+                logging.info('3 Using Begin: %s, End: %s', begin, end)
             if "exit" in response:
                 finish = False
                 response = {

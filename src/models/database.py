@@ -947,6 +947,7 @@ class Database:
             return 0
 
     def daily_fail_increment(self, usage_point_id, date, measurement_direction="consumption"):
+        logging.info('Increment daily fail date :%s', date)
         unique_id = hashlib.md5(f"{usage_point_id}/{date}".encode("utf-8")).hexdigest()
         if measurement_direction == "consumption":
             table = ConsumptionDaily
@@ -955,8 +956,10 @@ class Database:
             table = ProductionDaily
             relation = UsagePoints.relation_production_daily
         query = select(table).join(relation).where(table.id == unique_id)
+        
         logging.debug(query.compile(compile_kwargs={"literal_binds": True}))
         daily = self.session.scalars(query).one_or_none()
+        logging.info('Daily fail increment daily : %s', daily)
         if daily is not None:
             fail_count = int(daily.fail_count) + 1
             if fail_count >= MAX_IMPORT_TRY:
@@ -970,7 +973,9 @@ class Database:
             daily.value = 0
             daily.blacklist = blacklist
             daily.fail_count = fail_count
+            logging.info('Daily fail increment is not none :%s , value: %s, blacklist: %s, fail_count: %s', daily.date, daily.value, daily.blacklist, daily.fail_count)
         else:
+            logging.info('Daily add fail increment date :%s ', date)
             fail_count = 0
             self.session.add(
                 table(
@@ -1061,6 +1066,7 @@ class Database:
             relation = UsagePoints.relation_production_daily
         query = select(table).join(relation).where(table.id == unique_id)
         daily = self.session.scalars(query).one_or_none()
+        logging.info('Daily date :%s , daily: %s', date, daily)
         logging.debug(query.compile(compile_kwargs={"literal_binds": True}))
         if daily is not None:
             daily.id = unique_id
@@ -1069,7 +1075,9 @@ class Database:
             daily.value = value
             daily.blacklist = blacklist
             daily.fail_count = fail_count
+            logging.info('DB Daily adding is not none :%s , value: %s, blacklist: %s, fail_count: %s', daily.date, daily.value, daily.blacklist, daily.fail_count)
         else:
+            logging.info('DB Daily adding date :%s , value: %s, blacklist: %s, fail_count: %s', date, value, blacklist, fail_count)
             self.session.add(
                 table(
                     id=unique_id,
@@ -1083,6 +1091,7 @@ class Database:
         self.session.flush()
 
     def reset_daily(self, usage_point_id, date=None, mesure_type="consumption"):
+        logging.info('Reset daily date :%s', date)
         data = self.get_daily_date(usage_point_id, date, mesure_type)
         if mesure_type == "consumption":
             table = ConsumptionDaily
@@ -1102,6 +1111,7 @@ class Database:
             return False
 
     def delete_daily(self, usage_point_id, date=None, measurement_direction="consumption"):
+        logging.info('Delete daily date :%s', date)
         if measurement_direction == "consumption":
             table = ConsumptionDaily
         else:
@@ -1115,6 +1125,7 @@ class Database:
         return True
 
     def blacklist_daily(self, usage_point_id, date, action=True, measurement_direction="consumption"):
+        logging.info('Blacklist daily date :%s', date)
         unique_id = hashlib.md5(f"{usage_point_id}/{date}".encode("utf-8")).hexdigest()
         if measurement_direction == "consumption":
             table = ConsumptionDaily
@@ -1698,6 +1709,7 @@ class Database:
             daily.value = 0
             daily.blacklist = blacklist
             daily.fail_count = fail_count
+            logging.info('Power fail increment is not none :%s , value: %s, blacklist: %s, fail_count: %s', daily.date, daily.value, daily.blacklist, daily.fail_count)
         else:
             fail_count = 0
             self.session.add(
@@ -1711,6 +1723,7 @@ class Database:
                     fail_count=0,
                 )
             )
+            logging.info('Power fail increment date :%s , value: %s, blacklist: %s, fail_count: %s', date, value, blacklist, fail_count)
         self.session.flush()
         return fail_count
 

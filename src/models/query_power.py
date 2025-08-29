@@ -50,6 +50,7 @@ class Power:
             endpoint += "/cache"
         try:
             current_data = self.db.get_daily_power(self.usage_point_id, begin, end)
+            logging.info('get power : %s, begin: %s, end: %s', current_data, begin, end)
             if not current_data["missing_data"]:
                 logging.info(" => Toutes les données sont déjà en cache.")
                 output = []
@@ -61,10 +62,12 @@ class Power:
                 data = Query(endpoint=f"{self.url}/{endpoint}/", headers=self.headers).get()
                 blacklist = 0
                 max_histo = datetime.combine(datetime.now(), datetime.max.time()) - timedelta(days=1)
+                logging.info('Power max histo :%s', max_histo)
                 if hasattr(data, "status_code"):
                     if data.status_code == 200:
                         meter_reading = json.loads(data.text)["meter_reading"]
                         interval_reading = meter_reading["interval_reading"]
+                        logging.info('Power interval_reading :%s', interval_reading)
                         interval_reading_tmp = {}
                         for interval_reading_data in interval_reading:
                             date = datetime.strptime(interval_reading_data["date"], self.date_format_detail)
@@ -77,10 +80,14 @@ class Power:
                                 "value": interval_reading_data["value"],
                             }
                         for single_date in daterange(begin, end):
+                            logging.info('Power single_date1 :%s', single_date)
                             if single_date < max_histo:
+                                logging.info('Power single_date2 :%s', single_date)
                                 if single_date.strftime(self.date_format) in interval_reading_tmp:
                                     # FOUND
                                     single_date_value = interval_reading_tmp[single_date.strftime(self.date_format)]
+                                    logging.info('Power single_date3 value :%s', single_date_value)
+                                    logging.info('Power adding single_date3 date :%s', datetime.combine(single_date, datetime.min.time()))
                                     self.db.insert_daily_max_power(
                                         usage_point_id=self.usage_point_id,
                                         date=datetime.combine(single_date, datetime.min.time()),
@@ -162,6 +169,8 @@ class Power:
                 finish = False
                 logging.error("Arrêt de la récupération des données suite à une erreur.")
                 logging.error(f"Prochain lancement à {datetime.now() + timedelta(seconds=CONFIG.get('cycle'))}")
+                
+            logging.info('RESULT: %s', result)
         return result
 
     def reset(self, date=None):

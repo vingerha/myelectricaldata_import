@@ -25,6 +25,10 @@ class Query(object):
         logging.debug(f" - url : {self.endpoint}")
         logging.debug(f" - headers : {self.headers}")
         logging.debug(f" - params : {params}")
+        logging.info(f"[GET] Endpoint {self.endpoint}")
+        logging.info(f" - url : {self.endpoint}")
+        logging.info(f" - headers : {self.headers}")
+        logging.info(f" - params : {params}") 
         response = {}
         try:
             response = requests.request(
