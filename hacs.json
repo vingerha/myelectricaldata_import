@@ -1,0 +1,7 @@
+{
+  "name": "Myelectricaldata import from Enedis",
+  "render_readme": true,
+  "filename": "myelectricaldata_import.zip",
+  "homeassistant": "2023.10.1",
+  "zip_release": true
+}
